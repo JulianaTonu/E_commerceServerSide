@@ -28,6 +28,12 @@ async function run() {
     const cartCollection = client.db("eCommerceDb").collection("cartItem");
     const userCollection = client.db("eCommerceDb").collection("Users");
 
+    app.get('/product', async (req, res) => {
+      const query = {}
+      const cursor = eCommerceCollection.find(query)
+      const product = await cursor.toArray()
+      res.send(product)
+    })
 
 
 
