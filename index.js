@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -28,11 +29,23 @@ async function run() {
     const cartCollection = client.db("eCommerceDb").collection("cartItem");
     const userCollection = client.db("eCommerceDb").collection("Users");
 
+   
+
+  
+
+    //product
     app.get('/product', async (req, res) => {
       const query = {}
       const cursor = eCommerceCollection.find(query)
       const product = await cursor.toArray()
       res.send(product)
+    })
+
+    app.post('/product', async (req, res) => {
+      const item = req.body;
+      const result = await eCommerceCollection.insertOne(item)
+      res.send(result)
+
     })
 
     app.get('/product/:id', async (req, res) => {
