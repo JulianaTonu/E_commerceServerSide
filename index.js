@@ -31,7 +31,13 @@ async function run() {
 
    
 
-  
+   //User Collections
+   app.get('/users', async (req, res) => {
+    const query = {}
+    const cursor = userCollection.find(query)
+    const result = await cursor.toArray()
+    res.send(result)
+  })
 
     //product
     app.get('/product', async (req, res) => {
