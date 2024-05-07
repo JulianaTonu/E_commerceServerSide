@@ -24,20 +24,80 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-
     const eCommerceCollection = client.db("eCommerceDb").collection("eCommerce");
     const cartCollection = client.db("eCommerceDb").collection("cartItem");
     const userCollection = client.db("eCommerceDb").collection("Users");
 
-   
+    //jwt
+    app.post('/jwt', async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '4h'
+      })
+      res.send({ token })
+    })
 
-   //User Collections
-   app.get('/users', async (req, res) => {
-    const query = {}
-    const cursor = userCollection.find(query)
-    const result = await cursor.toArray()
-    res.send(result)
-  })
+
+    //User Collections
+    app.get('/users', verifyToken,verifyAdmin, async (req, res) => {
+      const query = {}
+      console.log('Token', req.headers.authorization)
+      const cursor = userCollection.find(query)
+      const result = await cursor.toArray()
+      res.send(result)
+    })
+
+
+
+    //admin
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      const query = { email: email };
+      const user = await userCollection.findOne(query)
+      let admin = false;
+      if (user) {
+        admin = user?.role === 'admin'
+      }
+      res.send({ admin })
+    })
+
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email }
+      const existingUser = await userCollection.findOne(query)
+      if (existingUser) {
+        return res.send({ message: 'User already exists', insertedId: null })
+      }
+      const result = await userCollection.insertOne(user)
+      res.send(result)
+    })
+
+
+
+
+    app.patch('/users/admin/:id',verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: { role: 'admin' }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc)
+      res.send(result)
+    })
+
+
+    app.delete('/users/:id',verifyToken,verifyAdmin,async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await userCollection.deleteOne(query)
+      res.send(result);
+    })
+
+
 
     //product
     app.get('/product', async (req, res) => {
@@ -47,7 +107,7 @@ async function run() {
       res.send(product)
     })
 
-    app.post('/product', async (req, res) => {
+    app.post('/product',verifyToken,verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await eCommerceCollection.insertOne(item)
       res.send(result)
@@ -62,6 +122,7 @@ async function run() {
 
     })
 
+  
     //cart collection
     app.get('/carts', async (req, res) => {
       const query = {}
