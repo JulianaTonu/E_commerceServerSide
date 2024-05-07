@@ -150,7 +150,12 @@ async function run() {
 
     })
 
-   
+    app.delete('/product/:id',verifyToken,verifyAdmin,async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await eCommerceCollection.deleteOne(query)
+      res.send(result);
+    })
 
     //cart collection
     app.get('/carts', async (req, res) => {
