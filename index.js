@@ -5,8 +5,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 
 //middleware
+console.log("sk", process.env.STRIPE_SECRET_KEY)
 app.use(cors());
 app.use(express.json());
 
@@ -39,7 +42,7 @@ async function run() {
 
     //middlewares
     const verifyToken = (req, res, next) => {
-      console.log('inside verify token', req.headers.authorization);
+      // console.log('inside verify token', req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -54,7 +57,7 @@ async function run() {
       })
     }
 
-//verifyAdmin after verifyToken
+    //verifyAdmin after verifyToken
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
@@ -67,7 +70,7 @@ async function run() {
     }
 
     //User Collections
-    app.get('/users', verifyToken,verifyAdmin, async (req, res) => {
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       const query = {}
       console.log('Token', req.headers.authorization)
       const cursor = userCollection.find(query)
@@ -107,7 +110,7 @@ async function run() {
 
 
 
-    app.patch('/users/admin/:id',verifyAdmin, async (req, res) => {
+    app.patch('/users/admin/:id', verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -118,7 +121,7 @@ async function run() {
     })
 
 
-    app.delete('/users/:id',verifyToken,verifyAdmin,async (req, res) => {
+    app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await userCollection.deleteOne(query)
@@ -135,7 +138,7 @@ async function run() {
       res.send(product)
     })
 
-    app.post('/product',verifyToken,verifyAdmin, async (req, res) => {
+    app.post('/product', verifyToken, verifyAdmin, async (req, res) => {
       const item = req.body;
       const result = await eCommerceCollection.insertOne(item)
       res.send(result)
@@ -150,7 +153,26 @@ async function run() {
 
     })
 
-    app.delete('/product/:id',verifyToken,verifyAdmin,async (req, res) => {
+    // updateProduct
+    app.patch('/product/:id', async (req, res) => {
+      const product = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          productName: product.productName,
+          category: product.category,
+          oldPrice: product.oldPrice,
+          newPrice: product.newPrice,
+          details: product.details,
+          img: product.img
+        }
+      }
+      const result = await eCommerceCollection.updateOne(filter, updatedDoc)
+      res.send(result);
+    })
+
+    app.delete('/product/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await eCommerceCollection.deleteOne(query)
@@ -185,6 +207,21 @@ async function run() {
       const result = await cartCollection.deleteOne(query);
       res.send(result);
     });
+
+    //payment Intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      console.log(amount, "amount inside the content")
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        'payment_method_types': ['card']
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    })
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
