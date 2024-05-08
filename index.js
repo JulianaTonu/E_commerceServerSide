@@ -30,6 +30,7 @@ async function run() {
     const eCommerceCollection = client.db("eCommerceDb").collection("eCommerce");
     const cartCollection = client.db("eCommerceDb").collection("cartItem");
     const userCollection = client.db("eCommerceDb").collection("Users");
+    const paymentCollection = client.db("eCommerceDb").collection("payment");
 
     //jwt
     app.post('/jwt', async (req, res) => {
@@ -222,6 +223,27 @@ async function run() {
         clientSecret: paymentIntent.client_secret,
       });
     })
+
+
+    app.post('/payments', async (req, res) => {
+      const payment = req.body;
+      const paymentResult = await paymentCollection.insertOne(payment);
+      console.log(payment);
+      const query = {
+        _id: {
+          $in: payment.cartIds.map(id => new ObjectId(id))
+        }
+      };
+      const deleteResult = await cartCollection.deleteMany(query);
+      
+      // Sending paymentResult and deleteResult separately
+      res.status(200).send({ paymentResult, deleteResult });
+    });
+    
+
+
+
+
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
