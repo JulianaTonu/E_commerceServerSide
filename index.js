@@ -223,12 +223,12 @@ async function run() {
       });
     })
 
-    app.get('/payments/:email', verifyToken,async(req,res)=>{
-      const query ={email:req.params.email}
-      if(req.params.email !== req.decoded.email){
-        return res.status(403).send({message:'forbidden access'})
+    app.get('/payments/:email', verifyToken, async (req, res) => {
+      const query = { email: req.params.email }
+      if (req.params.email !== req.decoded.email) {
+        return res.status(403).send({ message: 'forbidden access' })
       }
-      const result =await paymentCollection.find(query).toArray()
+      const result = await paymentCollection.find(query).toArray()
       res.send(result);
     })
 
@@ -242,40 +242,96 @@ async function run() {
         }
       };
       const deleteResult = await cartCollection.deleteMany(query);
-      
+
       // Sending paymentResult and deleteResult separately
       res.status(200).send({ paymentResult, deleteResult });
     });
-    
 
-//stats or analytics
-app.get('/admin-stats',verifyToken,verifyAdmin, async(req,res)=>{
-  const users =await userCollection.estimatedDocumentCount();
-  const products =await eCommerceCollection.estimatedDocumentCount();
-  const orders =await paymentCollection.estimatedDocumentCount();
 
-  // const payments =await paymentCollection.find().toArray();
-  // const revenue =payments.reduce((total,payment)=>total + payment.price, 0); 
+    //stats or analytics
+    app.get('/admin-stats', verifyToken, verifyAdmin, async (req, res) => {
+      const users = await userCollection.estimatedDocumentCount();
+      const products = await eCommerceCollection.estimatedDocumentCount();
+      const orders = await paymentCollection.estimatedDocumentCount();
 
-  const result =await paymentCollection.aggregate([
-    {
-      $group:{
-        _id:null,
-        totalRevenue:{
-          $sum:'$price'
+      // const payments =await paymentCollection.find().toArray();
+      // const revenue =payments.reduce((total,payment)=>total + payment.price, 0); 
+
+      const result = await paymentCollection.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalRevenue: {
+              $sum: '$price'
+            }
+          }
         }
-      }
-    }
-  ]).toArray();
-  const revenue = result.length > 0 ? result[0].totalRevenue : 0;
-  res.send({
-    users,
-    products,
-    orders,
-    revenue
-  })
-})
+      ]).toArray();
+      const revenue = result.length > 0 ? result[0].totalRevenue : 0;
+      res.send({
+        users,
+        products,
+        orders,
+        revenue
+      })
+    })
 
+
+    //using aggregate pipeline
+    app.get('/order-stats', async (req, res) => {
+      const result = await paymentCollection.aggregate([
+        {
+          $unwind: '$productIds'
+        },
+
+        //its not working bcz 2jaygay field name diffrent
+        //   {
+        //     $lookup: {
+        //         from:'eCommerce', // Lookup from the eCommerce collection
+        //         localField:'productIds',
+        //         foreignField:'_id',
+        //         as: 'products' // Store the matching products in the 'products' field
+        //     }
+        // },
+
+        {
+          $lookup: {
+            from: 'eCommerce',
+            let: { productId: { $toObjectId: '$productIds' } }, // Convert productIds to ObjectId
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ['$_id', '$$productId'] } // Perform matching
+                }
+              }
+            ],
+            as: 'products'
+          }
+        },
+
+        {
+          $unwind: '$products'
+        },
+        {
+          $group: {
+            _id: '$products.category',
+            quantity: { $sum: 1 },
+            revenue: { $sum: '$products.newPrice' }
+          }
+        },
+
+        {
+          $project: {
+            _id: 0,
+            category: '$_id',
+            quantity: '$quantity',
+            revenue: '$revenue'
+          }
+        }
+
+      ]).toArray();
+      res.send(result)
+    })
 
 
     // Connect the client to the server	(optional starting in v4.7)
