@@ -30,6 +30,7 @@ async function run() {
     const cartCollection = client.db("eCommerceDb").collection("cartItem");
     const userCollection = client.db("eCommerceDb").collection("Users");
     const paymentCollection = client.db("eCommerceDb").collection("payment");
+    const reviewCollection = client.db("eCommerceDb").collection("review");
 
     //jwt
     app.post('/jwt', async (req, res) => {
@@ -208,6 +209,37 @@ async function run() {
       res.send(result);
     });
 
+
+     //add review
+     app.post('/reviews',async(req,res)=>{
+      const review=req.body;
+      console.log(review)
+      const result =await reviewCollection.insertOne(review)
+      res.send(result)
+  })
+  app.get('/review/:id', async(req, res)=>{
+    const id =req.params.id;
+    const query ={_id:ObjectId(id)};
+    const review =await reviewCollection.findOne(query)
+    res.send(review);
+})
+
+app.get('/reviews/product', async(req,res)=>{
+
+  let query={};
+  console.log(req.query.productName)
+
+  if(req.query.productName){
+      query={
+        productName:req.query.productName
+      }
+  }
+  // sort({myDate:-1})
+  const cursor=  reviewCollection.find(query).sort({myDate:-1})
+  const reviews =await cursor.toArray()
+  res.send(reviews)
+
+})
     //payment Intent
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
